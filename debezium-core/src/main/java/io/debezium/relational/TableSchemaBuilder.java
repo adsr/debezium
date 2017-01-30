@@ -54,7 +54,7 @@ public class TableSchemaBuilder {
 
     /**
      * Create a new instance of the builder.
-     *
+     * 
      * @param valueConverterProvider the provider for obtaining {@link ValueConverter}s and {@link SchemaBuilder}s; may not be
      *            null
      * @param schemaNameValidator the validation function for schema names; may not be null
@@ -194,6 +194,7 @@ public class TableSchemaBuilder {
                         }
                     }
                 }
+
                 return result;
             };
         }

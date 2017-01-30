@@ -70,6 +70,11 @@ class BinlogReaderMetrics extends Metrics implements BinlogReaderMetricsMXBean {
     }
 
     @Override
+    public long getTotalBytesReceived() {
+        return this.stats.getTotalBytesReceived();
+    }
+
+    @Override
     public long getNumberOfSkippedEvents() {
         return this.stats.getNumberOfSkippedEvents();
     }

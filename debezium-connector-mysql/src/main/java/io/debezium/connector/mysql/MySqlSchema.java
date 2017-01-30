@@ -10,6 +10,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import com.github.shyiko.mysql.binlog.event.ColumnDescriptor;
+import com.github.shyiko.mysql.binlog.event.TableMetadataEventData;
+
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
@@ -100,6 +103,7 @@ public class MySqlSchema {
         BigIntUnsignedMode bigIntUnsignedMode = bigIntUnsignedHandlingMode.asBigIntUnsignedMode();
         MySqlValueConverters valueConverters = new MySqlValueConverters(decimalMode, timePrecisionMode, bigIntUnsignedMode);
         this.schemaBuilder = new TableSchemaBuilder(valueConverters, schemaNameValidator::validate);
+        this.schemaBuilder.setPartitionByTableName(config.getBoolean(MySqlConnectorConfig.PARTITION_BY_TABLE_NAME));
 
         // Set up the server name and schema prefix ...
         if (serverName != null) serverName = serverName.trim();
@@ -198,6 +202,51 @@ public class MySqlSchema {
      */
     public TableSchema schemaFor(TableId id) {
         return filters.tableFilter().test(id) ? tableSchemaByTableId.get(id) : null;
+    }
+
+    public TableSchema schemaFromMetadata(TableId id, TableMetadataEventData metadata) {
+        if (!filters.tableFilter().test(id)) {
+            return null;
+        }
+        TableSchema schema = tableSchemaByTableId.get(id);
+
+        if (schema != null && schema.getTableVersionId() == metadata.getTableId()) {
+            return schema;
+        }
+
+        List<Column> columnDefs = new ArrayList<Column>();
+        List<String> pkNames = new ArrayList<String>();
+        int pos = 1;
+        for (ColumnDescriptor descriptor : metadata.getColumnDescriptors()) {
+            // See https://github.com/percona/percona-server/blob/5.6/include/mysql_com.h#L95 for bitmasks
+            boolean isPkey = (descriptor.getFlags() & 2) == 2;
+            boolean isAutoIncr = (descriptor.getFlags() & 512) == 512;
+            boolean hasDefault = (descriptor.getFlags() & 4096) != 4096;
+            boolean isNullable = (descriptor.getFlags() & 1) != 1;
+            boolean isOptional = hasDefault || isNullable;
+            Column col = Column.editor()
+                .name(descriptor.getName())
+                .position(pos)
+                .jdbcType(MysqlToJdbc.mysqlToJdbcType(descriptor.getType()))
+                .type(descriptor.getTypeName())
+                .charsetName(MysqlToJdbc.mysqlCharsetNumToName(descriptor.getCharacterSet()))
+                .length(descriptor.getLength())
+                .scale(descriptor.getScale())
+                .optional(isOptional)
+                .generated(false)
+                .autoIncremented(isAutoIncr)
+                .create();
+            columnDefs.add(col);
+            if (isPkey) {
+                pkNames.add(descriptor.getName());
+            }
+            pos++;
+        }
+        tables.overwriteTable(id, columnDefs, pkNames, null); // TODO test null charset
+        schema = schemaBuilder.create(schemaPrefix, tables.forTable(id), filters.columnFilter(), filters.columnMappers());
+        schema.setTableVersionId(metadata.getTableId());
+        tableSchemaByTableId.put(id, schema);
+        return schema;
     }
 
     /**

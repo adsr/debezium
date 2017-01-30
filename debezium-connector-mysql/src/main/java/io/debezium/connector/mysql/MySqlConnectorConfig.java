@@ -192,7 +192,17 @@ public class MySqlConnectorConfig {
         /**
          * Perform a snapshot and then stop before attempting to read the binlog.
          */
-        INITIAL_ONLY("initial_only");
+        INITIAL_ONLY("initial_only"),
+
+        /**
+         * 1) Never performs a snapshot (gets schema info from twitter patch)
+         * 2) The first time Debezium connects in this mode, it sets Debezium's executed GTID set to be the same as
+         *      that of MySQL server it is connecting to. This is necessary to allow Debezium to reconnect later.
+         * 3) The first time Debezium connects in this mode, it starts reading the binlog at the GTID corresponding to
+         *      the last GTID in the executed GTID set we marked in step 2 (i.e. starts reading at the binlog's current
+         *      position).
+         */
+        TWITTER_PATCH("twitter_patch");
 
         private final String value;
 
@@ -689,6 +699,14 @@ public class MySqlConnectorConfig {
                                                                     + "contains the database name and whose value includes the DDL statement(s)."
                                                                     + "The default is 'true'. This is independent of how the connector internally records database history.")
                                                             .withDefault(true);
+
+    public static final Field EXPECT_METADATA_EVENTS = Field.create("database.mysql.expect_metadata_events")
+                                                            .withDisplayName("Expect metadata events")
+                                                            .withType(Type.BOOLEAN)
+                                                            .withWidth(Width.SHORT)
+                                                            .withImportance(Importance.MEDIUM)
+                                                            .withDescription("When enabled, Debezium will track schemas based on TABLE_METADATA events")
+                                                            .withDefault(false);
 
     public static final Field SNAPSHOT_MODE = Field.create("snapshot.mode")
                                                    .withDisplayName("Snapshot mode")
