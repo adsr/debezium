@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.List;
+import java.util.ArrayList;
 
 import com.github.shyiko.mysql.binlog.event.ColumnDescriptor;
 import com.github.shyiko.mysql.binlog.event.TableMetadataEventData;
@@ -32,6 +34,7 @@ import io.debezium.relational.TableId;
 import io.debezium.relational.TableSchema;
 import io.debezium.relational.TableSchemaBuilder;
 import io.debezium.relational.Tables;
+import io.debezium.relational.Column;
 import io.debezium.relational.ddl.DdlChanges;
 import io.debezium.relational.ddl.DdlChanges.DatabaseStatementStringConsumer;
 import io.debezium.relational.history.DatabaseHistory;
@@ -103,7 +106,6 @@ public class MySqlSchema {
         BigIntUnsignedMode bigIntUnsignedMode = bigIntUnsignedHandlingMode.asBigIntUnsignedMode();
         MySqlValueConverters valueConverters = new MySqlValueConverters(decimalMode, timePrecisionMode, bigIntUnsignedMode);
         this.schemaBuilder = new TableSchemaBuilder(valueConverters, schemaNameValidator::validate);
-        this.schemaBuilder.setPartitionByTableName(config.getBoolean(MySqlConnectorConfig.PARTITION_BY_TABLE_NAME));
 
         // Set up the server name and schema prefix ...
         if (serverName != null) serverName = serverName.trim();
